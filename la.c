@@ -42,7 +42,7 @@ void set(List* list, size_t index, void* data) {
     if (index >= list->array_size) {
         list->array_size *= 2;
         void** new_array = malloc(sizeof(void*) * list->array_size);
-        memcpy(new_array, list->array, list->array_size);
+        memcpy(new_array, list->array, list->len * sizeof(void*));
         free(list->array);
         list->array = new_array;
     }
@@ -72,6 +72,8 @@ int main(int argc, char *argv[]) {
         perror("getcwd() error");
         return 1;
     }
+
+    // char* current_working_dir = "/home/brandon/Documents";
 
 
     // collect files and dirs
@@ -196,6 +198,13 @@ int main(int argc, char *argv[]) {
             printf("%s\n", file->file_path);
         }
 
+    }
+
+
+    for (int i = 0; i < files->len; ++i) {
+        File* file = files->array[i];
+        free(file->file_path);
+        free(file);
     }
 
 
