@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "cstddef": "cpp",
+        "cstdlib": "c",
+        "type_traits": "c",
+        "list.h": "c",
+        "map.h": "c",
+        "string.h": "c",
+        "stringstream.h": "c",
+        "stdlib.h": "c",
+        "set.h": "c",
+        "csvdb.h": "c",
+        "stdio.h": "c"
+    }
+}

@@ -1,0 +1,6 @@
+
+EXECUTABLE_NAME='la'
+
+FILE='la.c'
+
+# DIRECTORY='.'
