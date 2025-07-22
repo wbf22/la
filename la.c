@@ -184,7 +184,8 @@ int main(int argc, char *argv[]) {
             size[5] = ' ';
             size[6] = ' ';
             size[7] = ' ';
-            size[8] = '\0';
+            size[8] = ' ';
+            size[9] = '\0';
         }
         printf("%s     ", size);
 
