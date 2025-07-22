@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
 
 
         // size
-        char size[9];
+        char size[10];
         if (!file->is_dir) {
             double file_size = file->file_size;
             
@@ -138,41 +138,41 @@ int main(int argc, char *argv[]) {
                 file_size /= 1000000000000000;
                 char val[5];
                 truncate_6(file_size, val);
-                snprintf(size, 9, "%s PB    ", val);
+                snprintf(size, 10, "%s PB    ", val);
             }
             // TB
-            if (file_size > 1000000000000) {
+            else if (file_size > 1000000000000) {
                 file_size /= 1000000000000;
                 char val[5];
                 truncate_6(file_size, val);
-                snprintf(size, 9, "%s TB    ", val);
+                snprintf(size, 10, "%s TB    ", val);
             }
             // GB
-            if (file_size > 1000000000) {
+            else if (file_size > 1000000000) {
                 file_size /= 1000000000;
                 char val[5];
                 truncate_6(file_size, val);
-                snprintf(size, 9, "%s GB    ", val);
+                snprintf(size, 10, "%s GB    ", val);
             }
             // MB
-            if (file_size > 1000000) {
+            else if (file_size > 1000000) {
                 file_size /= 1000000;
                 char val[5];
                 truncate_6(file_size, val);
-                snprintf(size, 9, "%s MB    ", val);
+                snprintf(size, 10, "%s MB    ", val);
             }
             // KB
             else if (file_size > 1000) {
                 file_size /= 1000;
                 char val[5];
                 truncate_6(file_size, val);
-                snprintf(size, 9, "%s KB    ", val);
+                snprintf(size, 10, "%s KB    ", val);
             }
             // bytes
             else {
                 char val[5];
                 truncate_6(file_size, val);
-                snprintf(size, 9, "%s B     ", val);
+                snprintf(size, 10, "%s B     ", val);
             }
         }
         else {
