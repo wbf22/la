@@ -10,8 +10,9 @@
             "name": "Test C",
             "program": "${workspaceFolder}/la",
             "args": [],
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "bear_make"
+            "cwd": "/Users/wfowler/Documents",
+            "preLaunchTask": "bear_make",
+            // "console": "externalTerminal"
         }
     ]
 }

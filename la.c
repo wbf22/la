@@ -40,11 +40,12 @@ int compare_files_by_name(const void *a, const void *b) {
 void set(List* list, size_t index, void* data) {
     // resize if needed
     if (index >= list->array_size) {
-        list->array_size *= 2;
+        list->array_size = list->array_size * 1.2 + 10;
         void** new_array = malloc(sizeof(void*) * list->array_size);
         memcpy(new_array, list->array, list->len * sizeof(void*));
         free(list->array);
         list->array = new_array;
+        // printf("resize %d\n", list->array_size);
     }
 
     // set
@@ -95,8 +96,8 @@ int main(int argc, char *argv[]) {
 
 
         File* file = malloc(sizeof(File));
-        file->file_path = malloc(strlen(entry->d_name));
-        strcpy(file->file_path, &entry->d_name);
+        file->file_path = malloc(strlen(entry->d_name)+1);
+        strcpy(file->file_path, entry->d_name);
         file->file_size = info.st_size;
         file->last_modified = info.st_mtime;
 
