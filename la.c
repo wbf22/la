@@ -260,7 +260,7 @@ int main(int argc, char *argv[]) {
 
         // size
         char size[10];
-        if (!file->type == DIRECTORY) {
+        if (file->type != DIRECTORY) {
             double file_size = file->file_size;
             
             // PB           
