@@ -26,14 +26,20 @@ typedef struct File {
 } File;
 
 
-char* RED = "\x1b[38;2;255;0;0m";
-char* ORANGE = "\x1b[38;2;230;76;0m";
-char* YELLOW = "\x1b[38;2;230;226;0m";
-char* GREEN = "\x1b[38;2;0;186;40m";
-char* BLUE = "\x1b[38;2;0;72;255m";
-char* INDIGO = "\x1b[38;2;84;0;230m";
-char* VIOLET = "\x1b[38;2;176;0;230m";
+char* RED = "\x1b[38;2;168;50;50m";
+char* ORANGE = "\x1b[38;2;168;94:50m";
+char* YELLOW = "\x1b[38;2;212;185;8m";
+char* GREEN = "\x1b[38;2;52;117;22m";
+char* BLUE = "\x1b[38;2;97;99;212m";
+char* INDIGO = "\x1b[38;2;104;50;140m";
+char* VIOLET = "\x1b[38;2;140;50;140m";
+char* GREY = "\x1b[38;2;107;107;107m";
+char* BROWN = "\x1b[38;2;156;100;44m";
+char* CYAN = "\x1b[38;2;26;137;173m";
 char* ANSII_RESET = "\x1b[0m";
+
+
+int MAX_COUNT = 500;
 
 typedef struct List {
     void** array;
@@ -86,7 +92,7 @@ int is_media(const char *path) {
     if (!ext) return 0;
 
     const char *media[] = {
-        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".ico", // images
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".ico", ".svg", ".webp", ".avif", ".xcf", // images
         ".mp3", ".wav", ".flac", ".ogg", ".m4a",                  // audio
         ".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv"           // video
     };
@@ -108,7 +114,7 @@ int is_code_file(const char *path) {
         ".php", ".rb", ".sh", ".pl", ".lua",        // PHP, Ruby, Shell, Perl, Lua
         ".cs", ".m", ".r", ".scala", ".dart",        // C#, Objective-C, R, Scala, Dart
         ".md", ".xml", ".html", ".csv", ".css",       // other
-        ".json", ".yml", ".bat", ".sql",       // other
+        ".json", ".yml", ".bat", ".sql", ".kv"       // other
     };
 
     size_t n = sizeof(code_exts)/sizeof(code_exts[0]);
@@ -134,7 +140,14 @@ int is_html(const char *path) {
 }
 
 void print_rainbow(const char *str) {
-    const char *colors[] = { RED, ORANGE, YELLOW, GREEN, BLUE, INDIGO, VIOLET };
+    char* R_RED = "\x1b[38;2;255;0;0m";
+    char* R_ORANGE = "\x1b[38;2;230;76;0m";
+    char* R_YELLOW = "\x1b[38;2;230;226;0m";
+    char* R_GREEN = "\x1b[38;2;0;186;40m";
+    char* R_BLUE = "\x1b[38;2;0;72;255m";
+    char* R_INDIGO = "\x1b[38;2;84;0;230m";
+    char* R_VIOLET = "\x1b[38;2;176;0;230m";
+    const char *colors[] = { R_RED, R_ORANGE, R_YELLOW, R_GREEN, R_BLUE, R_INDIGO, R_VIOLET };
     for (int i = 0; i < strlen(str); i++) {
         printf("%s%c", colors[i%7], str[i]);
     }
@@ -142,10 +155,30 @@ void print_rainbow(const char *str) {
 }
 
 
-int compare_files_by_name(const void *a, const void *b) {
+int compare_files_by_name_and_type(const void *a, const void *b) {
     File *const *a_ptr = (File *const *)a;
     File *const *b_ptr = (File *const *)b;
-    return strcasecmp((*a_ptr)->file_path, (*b_ptr)->file_path);  // returns positive, zero, or negative
+
+    // First priority: dot-files/folders come first
+    int a_is_dot = ((*a_ptr)->file_path[0] == '.');
+    int b_is_dot = ((*b_ptr)->file_path[0] == '.');
+
+    if (a_is_dot != b_is_dot) {
+        return b_is_dot - a_is_dot;  // dot items come first (negative return)
+    }
+
+    // Second priority: directories come before files (within same dot/non-dot group)
+    if ((*a_ptr)->type != (*b_ptr)->type) {
+        if ((*a_ptr)->type == DIRECTORY) {
+            return -1;
+        }
+        else if ((*b_ptr)->type == DIRECTORY) {
+            return 1;
+        }
+    }
+
+    // Third priority: alphabetical by name
+    return strcasecmp((*a_ptr)->file_path, (*b_ptr)->file_path);
 }
 
 void set(List* list, size_t index, void* data) {
@@ -176,6 +209,119 @@ void truncate_6(double d, char* dest) {
     snprintf(dest, 7, "%.2f    ", d);
 }
 
+void print_file(File* file) {
+
+    // last modified
+    struct tm *local_time = localtime(&file->last_modified);
+    char time_str[100];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", local_time);
+    printf("\x1b[38;2;60;60;60m%s\x1b[0m     ", time_str);
+
+
+    // size
+    char size[10];
+    if (file->type != DIRECTORY && file->type != HIDDEN) {
+        double file_size = file->file_size;
+        
+        // PB           
+        if (file_size > 1000000000000000) {
+            file_size /= 1000000000000000;
+            char val[5];
+            truncate_6(file_size, val);
+            snprintf(size, 10, "%s PB    ", val);
+        }
+        // TB
+        else if (file_size > 1000000000000) {
+            file_size /= 1000000000000;
+            char val[5];
+            truncate_6(file_size, val);
+            snprintf(size, 10, "%s TB    ", val);
+        }
+        // GB
+        else if (file_size > 1000000000) {
+            file_size /= 1000000000;
+            char val[5];
+            truncate_6(file_size, val);
+            snprintf(size, 10, "%s GB    ", val);
+        }
+        // MB
+        else if (file_size > 1000000) {
+            file_size /= 1000000;
+            char val[5];
+            truncate_6(file_size, val);
+            snprintf(size, 10, "%s MB    ", val);
+        }
+        // KB
+        else if (file_size > 1000) {
+            file_size /= 1000;
+            char val[5];
+            truncate_6(file_size, val);
+            snprintf(size, 10, "%s KB    ", val);
+        }
+        // bytes
+        else {
+            char val[5];
+            truncate_6(file_size, val);
+            snprintf(size, 10, "%s B     ", val);
+        }
+    }
+    else {
+        size[0] = '-';
+        size[1] = '-';
+        size[2] = ' ';
+        size[3] = ' ';
+        size[4] = ' ';
+        size[5] = ' ';
+        size[6] = ' ';
+        size[7] = ' ';
+        size[8] = ' ';
+        size[9] = '\0';
+    }
+    printf("%s     ", size);
+
+
+    // file name
+    if (file->type == DIRECTORY) {
+        printf("%s%s%s\n", BLUE, file->file_path, ANSII_RESET);
+    }
+    else if (file->type == EXECUTABLE) {
+        printf("%s%s*%s\n", GREEN, file->file_path, ANSII_RESET);
+    }
+    else if (file->type == MEDIA) {
+        printf("%s%s%s\n", YELLOW, file->file_path, ANSII_RESET);
+    }
+    else if (file->type == ARCHIVE) {
+        printf("%s%s%s\n", RED, file->file_path, ANSII_RESET);
+    }
+    else if (file->type == HIDDEN) {
+        printf("%s%s%s\n", GREY, file->file_path, ANSII_RESET);
+    }
+    else if (file->type == SYMLINK) {
+        printf("%s%s%s\n", CYAN, file->file_path, ANSII_RESET);
+    }
+    else if (file->type == CODE) {
+        if (is_html(file->file_path)) {
+            print_rainbow(file->file_path);
+        }
+        else {
+            printf("%s%s%s\n", BROWN, file->file_path, ANSII_RESET);
+        }
+    }
+    else {
+        printf("%s\n", file->file_path);
+    }
+
+    /*
+
+    Folder / directory	Blue	Most terminals default to blue. Makes directories stand out.
+Regular file	Default / White	Keeps files unobtrusive.
+Executable file	Green	Common convention in ls --color=auto and many shells.
+Symbolic link	Cyan	Usually bright cyan or light blue.
+ARCHIVE / archive	Red / Magenta	tar, zip, etc.
+Image / media	Yellow / Magenta	Optional; can help distinguish media.
+Hidden files	Dim / Gray	Prefixing with dot (.) and dim color is common.
+    */
+}
 
 int main(int argc, char *argv[]) {
     char current_working_dir[PATH_MAX]; // buffer to hold the directory path
@@ -192,7 +338,10 @@ int main(int argc, char *argv[]) {
     List* files = list();
     DIR *dir = opendir(current_working_dir);
     struct dirent *entry;
+    int count = 0;
+    int HIT_MAX = 0;
     while ((entry = readdir(dir)) != NULL) {
+
         // Skip "." and ".." entries
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
@@ -238,145 +387,43 @@ int main(int argc, char *argv[]) {
         else {
             file->type = NORMAL;
         }
-        set(files, files->len, file);
+        
+        // check for hitting max file count
+        ++count;
+        if (count > MAX_COUNT && !HIT_MAX) {
+            HIT_MAX = 1;
+            for(int i = 0; i < files->len; ++i) {
+                File* file = files->array[i];
+                print_file(file);
+            }
+        }
+
+        // print out if at max, or add to list
+        if (HIT_MAX) {
+            print_file(file);
+        }
+        else {
+            set(files, files->len, file);
+        }
 
     }
 
+    if (!HIT_MAX) {
+        // sort by name
+        qsort(files->array, files->len, sizeof(File*), compare_files_by_name_and_type);
 
-    // sort by name
-    qsort(files->array, files->len, sizeof(File*), compare_files_by_name);
-
-
-    // print out
-    for(int i = 0; i < files->len; ++i) {
-        File* file = files->array[i];
-
-        // last modified
-        struct tm *local_time = localtime(&file->last_modified);
-        char time_str[100];
-        strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", local_time);
-        printf("\x1b[38;2;60;60;60m%s\x1b[0m     ", time_str);
-
-
-        // size
-        char size[10];
-        if (file->type != DIRECTORY && file->type != HIDDEN) {
-            double file_size = file->file_size;
-            
-            // PB           
-            if (file_size > 1000000000000000) {
-                file_size /= 1000000000000000;
-                char val[5];
-                truncate_6(file_size, val);
-                snprintf(size, 10, "%s PB    ", val);
-            }
-            // TB
-            else if (file_size > 1000000000000) {
-                file_size /= 1000000000000;
-                char val[5];
-                truncate_6(file_size, val);
-                snprintf(size, 10, "%s TB    ", val);
-            }
-            // GB
-            else if (file_size > 1000000000) {
-                file_size /= 1000000000;
-                char val[5];
-                truncate_6(file_size, val);
-                snprintf(size, 10, "%s GB    ", val);
-            }
-            // MB
-            else if (file_size > 1000000) {
-                file_size /= 1000000;
-                char val[5];
-                truncate_6(file_size, val);
-                snprintf(size, 10, "%s MB    ", val);
-            }
-            // KB
-            else if (file_size > 1000) {
-                file_size /= 1000;
-                char val[5];
-                truncate_6(file_size, val);
-                snprintf(size, 10, "%s KB    ", val);
-            }
-            // bytes
-            else {
-                char val[5];
-                truncate_6(file_size, val);
-                snprintf(size, 10, "%s B     ", val);
-            }
+        // print out
+        for(int i = 0; i < files->len; ++i) {
+            File* file = files->array[i];
+            print_file(file);
         }
-        else {
-            size[0] = '-';
-            size[1] = '-';
-            size[2] = ' ';
-            size[3] = ' ';
-            size[4] = ' ';
-            size[5] = ' ';
-            size[6] = ' ';
-            size[7] = ' ';
-            size[8] = ' ';
-            size[9] = '\0';
-        }
-        printf("%s     ", size);
-
-
-        // file name
-        if (file->type == DIRECTORY) {
-            //17, 34, 189
-            printf("\x1b[38;2;17;34;189m%s\x1b[0m\n", file->file_path);
-        }
-        else if (file->type == EXECUTABLE) {
-            // 17, 122, 28
-            printf("\x1b[38;2;17;122;28m%s*\x1b[0m\n", file->file_path);
-        }
-        else if (file->type == MEDIA) {
-            // 171, 176, 23
-            printf("\x1b[38;2;171;176;23m%s\x1b[0m\n", file->file_path);
-        }
-        else if (file->type == ARCHIVE) {
-            // 173, 26, 48
-            printf("\x1b[38;2;173;26;48m%s\x1b[0m\n", file->file_path);
-        }
-        else if (file->type == HIDDEN) {
-            // 107, 107, 107
-            printf("\x1b[38;2;107;107;107m%s\x1b[0m\n", file->file_path);
-        }
-        else if (file->type == SYMLINK) {
-            // 26, 137, 173
-            printf("\x1b[38;2;26;137;173m%s\x1b[0m\n", file->file_path);
-        }
-        else if (file->type == CODE) {
-            if (is_html(file->file_path)) {
-                print_rainbow(file->file_path);
-            }
-            else {
-                // 110, 56, 2
-                printf("\x1b[38;2;110;56;2m%s\x1b[0m\n", file->file_path);
-            }
-        }
-        else {
-            printf("%s\n", file->file_path);
-        }
-
-        /*
-
-        Folder / directory	Blue	Most terminals default to blue. Makes directories stand out.
-Regular file	Default / White	Keeps files unobtrusive.
-Executable file	Green	Common convention in ls --color=auto and many shells.
-Symbolic link	Cyan	Usually bright cyan or light blue.
-ARCHIVE / archive	Red / Magenta	tar, zip, etc.
-Image / media	Yellow / Magenta	Optional; can help distinguish media.
-Hidden files	Dim / Gray	Prefixing with dot (.) and dim color is common.
-        */
     }
-
 
     for (int i = 0; i < files->len; ++i) {
         File* file = files->array[i];
         free(file->file_path);
         free(file);
     }
-
 
     closedir(dir);
     free_list(files);
