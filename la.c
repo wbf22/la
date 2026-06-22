@@ -326,12 +326,17 @@ Hidden files	Dim / Gray	Prefixing with dot (.) and dim color is common.
 int main(int argc, char *argv[]) {
     char current_working_dir[PATH_MAX]; // buffer to hold the directory path
 
-    if (getcwd(current_working_dir, sizeof(current_working_dir)) == NULL) {
-        perror("getcwd() error");
-        return 1;
+    if (argc > 1) {
+        if (realpath(argv[1], current_working_dir) == NULL) {
+            perror("realpath() error");
+            return 1;
+        }
+    } else {
+        if (getcwd(current_working_dir, sizeof(current_working_dir)) == NULL) {
+            perror("getcwd() error");
+            return 1;
+        }
     }
-
-    // char* current_working_dir = "/home/brandon/Documents";
 
 
     // collect files and dirs
