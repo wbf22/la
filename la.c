@@ -40,6 +40,7 @@ char* ANSII_RESET = "\x1b[0m";
 
 
 int MAX_COUNT = 500;
+int TREE_THRESHOLD = 50;
 
 typedef struct List {
     void** array;
@@ -139,6 +140,84 @@ int is_html(const char *path) {
     return 0;
 }
 
+int has_subdirectories(const char *path) {
+    DIR *dir = opendir(path);
+    if (!dir) return 0;
+    struct dirent *entry;
+    int result = 0;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+        char subpath[PATH_MAX];
+        snprintf(subpath, PATH_MAX, "%s/%s", path, entry->d_name);
+        struct stat info;
+        if (stat(subpath, &info) == 0 && S_ISDIR(info.st_mode)) {
+            result = 1;
+            break;
+        }
+    }
+    closedir(dir);
+    return result;
+}
+
+void print_subdir_tree(const char *dir_path, const char *prefix, int *remaining) {
+    if (*remaining <= 0) return;
+
+    DIR *dir = opendir(dir_path);
+    if (!dir) return;
+
+    char names[128][PATH_MAX];
+    int count = 0;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL && count < 128) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+        char subpath[PATH_MAX];
+        snprintf(subpath, PATH_MAX, "%s/%s", dir_path, entry->d_name);
+        struct stat info;
+        if (stat(subpath, &info) == 0 && S_ISDIR(info.st_mode)) {
+            snprintf(names[count], PATH_MAX, "%s", entry->d_name);
+            count++;
+        }
+    }
+    closedir(dir);
+
+    if (count == 0) return;
+
+    qsort(names, count, PATH_MAX, (int (*)(const void*, const void*))strcasecmp);
+
+    int will_show = (*remaining < count) ? *remaining : count;
+    int has_more = (count > will_show);
+    int need_deeper = (*remaining > count);
+    int actually_shown = 0;
+
+    for (int i = 0; i < will_show; i++) {
+        if (*remaining <= 0) break;
+        (*remaining)--;
+        actually_shown++;
+
+        char child_path[PATH_MAX];
+        snprintf(child_path, PATH_MAX, "%s/%s", dir_path, names[i]);
+        int has_grandchildren = has_subdirectories(child_path);
+        int show_children = has_grandchildren && *remaining > 0 && need_deeper;
+
+        int use_tee = has_more || (i < count - 1);
+
+        printf("%s%s %s%s\n", prefix, use_tee ? "├──" : "└──", names[i],
+               show_children ? "" : (has_grandchildren ? "..." : ""));
+
+        if (show_children) {
+            char child_prefix[PATH_MAX];
+            snprintf(child_prefix, PATH_MAX, "%s%s   ", prefix, use_tee ? "│" : " ");
+            print_subdir_tree(child_path, child_prefix, remaining);
+        }
+    }
+
+    if (count > actually_shown) {
+        printf("%s...\n", prefix);
+    }
+}
+
 void print_rainbow(const char *str) {
     char* R_RED = "\x1b[38;2;255;0;0m";
     char* R_ORANGE = "\x1b[38;2;230;76;0m";
@@ -209,7 +288,7 @@ void truncate_6(double d, char* dest) {
     snprintf(dest, 7, "%.2f    ", d);
 }
 
-void print_file(File* file) {
+void print_file(File* file, const char* parent_path, int show_tree) {
 
     // last modified
     struct tm *local_time = localtime(&file->last_modified);
@@ -283,6 +362,15 @@ void print_file(File* file) {
     // file name
     if (file->type == DIRECTORY) {
         printf("%s%s%s\n", BLUE, file->file_path, ANSII_RESET);
+        if (show_tree) {
+            char full_path[PATH_MAX];
+            snprintf(full_path, PATH_MAX, "%s/%s", parent_path, file->file_path);
+            int remaining = 3;
+            char indent[40];
+            memset(indent, ' ', 39);
+            indent[39] = '\0';
+            print_subdir_tree(full_path, indent, &remaining);
+        }
     }
     else if (file->type == EXECUTABLE) {
         printf("%s%s*%s\n", GREEN, file->file_path, ANSII_RESET);
@@ -324,14 +412,23 @@ Hidden files	Dim / Gray	Prefixing with dot (.) and dim color is common.
 }
 
 int main(int argc, char *argv[]) {
-    char current_working_dir[PATH_MAX]; // buffer to hold the directory path
+    char current_working_dir[PATH_MAX];
+    int force_tree = 0;
+    int path_found = 0;
 
-    if (argc > 1) {
-        if (realpath(argv[1], current_working_dir) == NULL) {
-            perror("realpath() error");
-            return 1;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--tree") == 0) {
+            force_tree = 1;
+        } else if (!path_found) {
+            if (realpath(argv[i], current_working_dir) == NULL) {
+                perror("realpath() error");
+                return 1;
+            }
+            path_found = 1;
         }
-    } else {
+    }
+
+    if (!path_found) {
         if (getcwd(current_working_dir, sizeof(current_working_dir)) == NULL) {
             perror("getcwd() error");
             return 1;
@@ -399,13 +496,13 @@ int main(int argc, char *argv[]) {
             HIT_MAX = 1;
             for(int i = 0; i < files->len; ++i) {
                 File* file = files->array[i];
-                print_file(file);
+                print_file(file, current_working_dir, 0);
             }
         }
 
         // print out if at max, or add to list
         if (HIT_MAX) {
-            print_file(file);
+            print_file(file, current_working_dir, 0);
         }
         else {
             set(files, files->len, file);
@@ -418,9 +515,10 @@ int main(int argc, char *argv[]) {
         qsort(files->array, files->len, sizeof(File*), compare_files_by_name_and_type);
 
         // print out
+        int show_tree = force_tree || ((int)files->len <= TREE_THRESHOLD);
         for(int i = 0; i < files->len; ++i) {
             File* file = files->array[i];
-            print_file(file);
+            print_file(file, current_working_dir, show_tree);
         }
     }
 
