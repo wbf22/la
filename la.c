@@ -40,7 +40,7 @@ char* ANSII_RESET = "\x1b[0m";
 
 
 int MAX_COUNT = 500;
-int TREE_THRESHOLD = 50;
+int TREE_THRESHOLD = 32;
 
 typedef struct List {
     void** array;
